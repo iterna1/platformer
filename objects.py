@@ -2,6 +2,7 @@ import pygame
 
 
 class Player:
+    fps = 30
     idle_r = [pygame.image.load('data/animation/idle_r/%s.gif' % i) for i in range(20)]
     idle_l = [pygame.image.load('data/animation/idle_l/%s.gif' % i) for i in range(20)]
     run_r = [pygame.image.load('data/animation/run_r/%s.gif' % i) for i in range(12)]
@@ -18,6 +19,7 @@ class Player:
     def __init__(self, x, y):
         self.x = x
         self.y = y
+        self.last_action = None
         self.change_action('idle_r')
 
     def change_action(self, action):
@@ -46,12 +48,22 @@ class Player:
         elif action == 'climbslide_l':
             self.action = Player.climbslide_l
 
-        self.anim_count = 0
-        self.divider = len(self.action)
+        if action != self.last_action:
+            self.anim_count = 0
+            self.divider = round(Player.fps / len(self.action))
+            self.count = 0
+        else:
+            if (self.anim_count // self.divider) + 1 == len(self.action):
+                self.anim_count = 0
+                self.count = 0
+            else:
+                self.anim_count += 1
+                self.count = self.anim_count // self.divider
+        self.last_action = action
 
     def get_rect(self):
-        return self.action[self.anim_count].get_rect()
+        return self.action[self.count].get_rect()
 
     def update(self):
-        return self.action[self.anim_count // self.divider]
+        return self.action[self.count]
 
