@@ -1,6 +1,45 @@
 import pygame
 
 
+class Level:
+    def __init__(self):
+        self.blocks = set()
+
+    def add_block(self, tile, pos):
+        self.blocks.add(Block(tile, pos))
+
+
+class DayLevel(Level):
+    background = pygame.image.load('data/background/daybackground.png')
+    platform = pygame.image.load('data/tiles/day/platform.png')
+    block = pygame.image.load('data/tiles/day/block.png')
+    grassblock = pygame.image.load('data/tiles/day/grassblock.png')
+
+    def __init__(self):
+        super().__init__()
+        self.load_lvl()
+
+    def load_lvl(self):
+        with open('data/levels/day.txt', 'r') as file:
+            self.map = map(lambda line: line.rstrip(), file.readlines())
+
+        for block in self.map:
+            tile, x, y = block.split(';')
+            pos = (int(x) * 2, int(y) * 2)
+            self.add_block('data/tiles/day/%s.png' % tile, pos)
+
+
+class Block:
+    def __init__(self, tile, pos):
+        self.image = pygame.image.load(tile)
+        self.image = pygame.transform.scale(self.image, tuple(map(lambda i: i * 2, self.image.get_rect()[2:4])))
+        self.pos = pos
+        self.size = self.get_rect()
+
+    def get_rect(self):
+        return self.pos, self.image.get_rect()
+
+
 class Player:
     fps = 30
     idle_r = [pygame.image.load('data/animation/idle_r/%s.gif' % i) for i in range(20)]

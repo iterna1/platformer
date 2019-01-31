@@ -1,6 +1,13 @@
 import pygame
 from random import randrange
-from objects import Player
+from objects import *
+
+
+def game_level():
+    screen.blit(pygame.transform.scale(DayLevel.background, (1280, 424)), (0, 0))
+    level = DayLevel()
+    for block in level.blocks:
+        screen.blit(block.image, block.pos)
 
 
 def event_checker():
@@ -15,21 +22,24 @@ def event_checker():
                 background = backgrounds[randrange(3)]
 
     keys = pygame.key.get_pressed()
-    if keys[pygame.K_RIGHT]:
+    if keys[pygame.K_RIGHT] and 'jump' not in player.last_action:
         player.change_action('run_r')
         player.x += 5
-    elif keys[pygame.K_LEFT]:
+    elif keys[pygame.K_LEFT] and 'jump' not in player.last_action:
         player.x -= 5
         player.change_action('run_l')
     elif keys[pygame.K_SPACE]:
         player.change_action('jump_%s' % player.last_action[-1])
-        player.y -= 5
+        player.y -= 10
     else:
         player.change_action('idle_%s' % player.last_action[-1])
 
 
 def drawing():
-    screen.blit(pygame.transform.scale(pygame.image.load(background), (1280, 424)), (0, 0))
+    # Отрисовка уровня
+    game_level()
+
+    # Отрисовка игрока
     screen.blit(pygame.transform.scale(player.update(), (player.get_rect()[2] * 2, player.get_rect()[3] * 2)),
                 (player.x, player.y))
 
@@ -44,11 +54,11 @@ pygame.init()
 clock = pygame.time.Clock()
 info = pygame.display.Info()
 size = width, height = 1280, 424
-screen = pygame.display.set_mode(size, pygame.FULLSCREEN)
+screen = pygame.display.set_mode(size)
 backgrounds = ('data/background/daybackground.png', 'data/background/eveningbackground.png',
                'data/background/nightbackground.png')
 background = backgrounds[0]
-pygame.display.set_caption('THE GAME')
+pygame.display.set_caption('')
 fps = 30
 
 player = Player(30, 314)
