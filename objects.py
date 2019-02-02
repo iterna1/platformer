@@ -2,21 +2,34 @@ import pygame
 
 
 class Level:
-    def __init__(self):
-        self.blocks = set()
+    def __init__(self, start, end):
+        self.blocks = []
+        self.start = start
+        self.end = end
+        self.passed = False
+        self.spawn_player()
 
     def add_block(self, tile, pos):
-        self.blocks.add(Block(tile, pos))
+        self.blocks.append(Block(tile, pos))
+
+    def spawn_player(self):
+        self.player = Player(*self.start)
+
+    def reached_checkpoint(self):
+        self.passed = True
+
+    def collision(self, player_rect):
+        for block in self.blocks:
+            if player_rect.colliderect(block.rect):
+                return True
+        return False
 
 
 class DayLevel(Level):
     background = pygame.image.load('data/background/daybackground.png')
-    platform = pygame.image.load('data/tiles/day/platform.png')
-    block = pygame.image.load('data/tiles/day/block.png')
-    grassblock = pygame.image.load('data/tiles/day/grassblock.png')
 
     def __init__(self):
-        super().__init__()
+        super().__init__((30, 313), (1248, 254))
         self.load_lvl()
 
     def load_lvl(self):
@@ -29,15 +42,46 @@ class DayLevel(Level):
             self.add_block('data/tiles/day/%s.png' % tile, pos)
 
 
+class EveningLevel(Level):
+    background = pygame.image.load('data/background/eveningbackground.png')
+
+    def __init__(self):
+        super().__init__((30, 313), (1248, 254))
+        self.load_lvl()
+
+    def load_lvl(self):
+        with open('data/levels/evening.txt', 'r') as file:
+            self.map = map(lambda line: line.rstrip(), file.readlines())
+
+        for block in self.map:
+            tile, x, y = block.split(';')
+            pos = (int(x) * 2, int(y) * 2)
+            self.add_block('data/tiles/evening/%s.png' % tile, pos)
+
+
+class NightLevel(Level):
+    background = pygame.image.load('data/background/nightbackground.png')
+
+    def __init__(self):
+        super().__init__((30, 313), (1248, 254))
+        self.load_lvl()
+
+    def load_lvl(self):
+        with open('data/levels/night.txt', 'r') as file:
+            self.map = map(lambda line: line.rstrip(), file.readlines())
+
+        for block in self.map:
+            tile, x, y = block.split(';')
+            pos = (int(x) * 2, int(y) * 2)
+            self.add_block('data/tiles/night/%s.png' % tile, pos)
+
+
 class Block:
     def __init__(self, tile, pos):
         self.image = pygame.image.load(tile)
         self.image = pygame.transform.scale(self.image, tuple(map(lambda i: i * 2, self.image.get_rect()[2:4])))
         self.pos = pos
-        self.size = self.get_rect()
-
-    def get_rect(self):
-        return self.pos, self.image.get_rect()
+        self.rect = pygame.Rect(*self.pos, *self.image.get_rect()[2:4])
 
 
 class Player:
@@ -60,6 +104,9 @@ class Player:
         self.y = y
         self.last_action = None
         self.change_action('idle_r')
+        self.vx = 5
+        self.vy = -11
+        self.jump_time = 0
 
     def change_action(self, action):
         if action == 'idle_r':
@@ -101,8 +148,7 @@ class Player:
         self.last_action = action
 
     def get_rect(self):
-        return self.action[self.count].get_rect()
+        return pygame.Rect(self.x, self.y, *self.action[self.count].get_rect()[2:4])
 
     def update(self):
         return self.action[self.count]
-

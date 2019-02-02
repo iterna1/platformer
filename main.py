@@ -1,47 +1,102 @@
 import pygame
-from random import randrange
 from objects import *
 
 
+def variables():
+    global fps, g, right, left, jump, idle, level, levels, clock, size, width, height
+    clock = pygame.time.Clock()
+    size = width, height = 1280, 424
+    fps = 30
+    g = 10
+    levels = iter((EveningLevel(), DayLevel(), EveningLevel(), NightLevel()))
+    right, left, jump, idle = False, False, False, False
+    level = None
+
+
 def game_level():
-    screen.blit(pygame.transform.scale(DayLevel.background, (1280, 424)), (0, 0))
-    level = DayLevel()
-    for block in level.blocks:
-        screen.blit(block.image, block.pos)
+    global level
+    if level is None or level.passed:
+        level = next(levels)
 
 
 def event_checker():
-    global running, background
+    global running, right, left, jump, idle
     for event in pygame.event.get():
         if event.type == pygame.QUIT:
             running = False
         if event.type == pygame.KEYDOWN:
             if event.key == pygame.K_ESCAPE:
                 esc_menu()
-            elif event.key == pygame.K_DELETE:
-                background = backgrounds[randrange(3)]
+            if event.key == pygame.K_HOME:
+                level.spawn_player()
 
+    player = level.player
     keys = pygame.key.get_pressed()
-    if keys[pygame.K_RIGHT] and 'jump' not in player.last_action:
-        player.change_action('run_r')
-        player.x += 5
-    elif keys[pygame.K_LEFT] and 'jump' not in player.last_action:
-        player.x -= 5
-        player.change_action('run_l')
-    elif keys[pygame.K_SPACE]:
-        player.change_action('jump_%s' % player.last_action[-1])
-        player.y -= 10
+    if keys[pygame.K_RIGHT]:
+        right, left, idle = True, False, False
+    elif keys[pygame.K_LEFT]:
+        right, left, idle = False, True, False
     else:
-        player.change_action('idle_%s' % player.last_action[-1])
+        right, left = False, False
+    if keys[pygame.K_SPACE] and not jump:
+        jump, idle = True, False
+        level.player.jump_time = 0
+    if not any((right, left, jump)) or (jump and level.player.jump_time > 20):
+        right, left, jump, idle = False, False, False, True
+
+    if not jump:
+        if right:
+            level.player.change_action('run_r')
+            level.player.x += level.player.vx
+        elif left:
+            level.player.change_action('run_l')
+            level.player.x -= level.player.vx
+        elif idle:
+            level.player.change_action('idle_%s' % level.player.last_action[-1])
+    else:
+        if right:
+            level.player.change_action('jump_r')
+            level.player.vy += 1
+            if level.player.vy > 10:
+                level.player.vy = -11
+                jump = False
+            else:
+                level.player.y += level.player.vy
+                level.player.x += level.player.vx
+                level.player.change_action('jump_r')
+            level.player.jump_time += 1
+        elif left:
+            level.player.vy += 1
+            if level.player.vy > 10:
+                level.player.vy = -11
+                jump = False
+            else:
+                level.player.y += level.player.vy
+                level.player.x -= level.player.vx
+                level.player.change_action('jump_l')
+            level.player.jump_time += 1
+        else:
+            level.player.vy += 1
+            if level.player.vy > 10:
+                level.player.vy = -11
+                jump = False
+            else:
+                level.player.y += level.player.vy
+                level.player.change_action('jump_%s' % level.player.last_action[-1])
+            level.player.jump_time += 1
+    if level.collision(level.player.get_rect()):
+        level.player = player
 
 
 def drawing():
     # Отрисовка уровня
-    game_level()
-
+    screen.blit(pygame.transform.scale(level.background, (1280, 424)), (0, 0))
+    for block in level.blocks:
+        screen.blit(block.image, block.pos)
     # Отрисовка игрока
-    screen.blit(pygame.transform.scale(player.update(), (player.get_rect()[2] * 2, player.get_rect()[3] * 2)),
-                (player.x, player.y))
+    screen.blit(pygame.transform.scale(level.player.update(),
+                                       (level.player.get_rect()[2] * 2, level.player.get_rect()[3] * 2)),
+                (level.player.x, level.player.y))
 
 
 def esc_menu():
@@ -51,20 +106,14 @@ def esc_menu():
 
 pygame.init()
 
-clock = pygame.time.Clock()
-info = pygame.display.Info()
-size = width, height = 1280, 424
+variables()
 screen = pygame.display.set_mode(size)
-backgrounds = ('data/background/daybackground.png', 'data/background/eveningbackground.png',
-               'data/background/nightbackground.png')
-background = backgrounds[0]
 pygame.display.set_caption('')
-fps = 30
 
-player = Player(30, 314)
 # main loop
 running = True
 while running:
+    game_level()
     event_checker()
     drawing()
     # updating frame
