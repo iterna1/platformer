@@ -4,24 +4,58 @@ import pygame
 class Level:
     def __init__(self, start, end):
         self.blocks = []
+        self.floors = []
+        self.walls = []
+        self.traps = []
         self.start = start
         self.end = end
         self.passed = False
         self.spawn_player()
 
     def add_block(self, tile, pos):
-        self.blocks.append(Block(tile, pos))
+        block = Block(tile, pos)
+        self.blocks.append(block)
+
+    def add_floor(self, tile, pos):
+        block = Floor(tile, pos)
+        self.floors.append(block)
+
+    def add_wall(self, tile, pos):
+        block = Wall(tile, pos)
+        self.walls.append(block)
+
+    def add_trap(self, tile, pos):
+        block = Trap(tile, pos)
+        self.traps.append(block)
 
     def spawn_player(self):
         self.player = Player(*self.start)
 
-    def reached_checkpoint(self):
-        self.passed = True
+    def add_hp(self):
+        self.hp += 1
 
-    def collision(self, player_rect):
-        for block in self.blocks:
-            if player_rect.colliderect(block.rect):
-                return True
+    def reached_checkpoint(self):
+        if (self.player.x, self.player.y) == self.end:
+            self.passed = True
+            return True
+        return False
+
+    def floor_collision(self, x, y):
+        player = Player(x, y)
+        if any([player.foot_rect().colliderect(block.rect) for block in self.floors]):
+            return True
+        return False
+
+    def wall_collision(self, x, y):
+        player = Player(x, y)
+        if any([player.get_rect().colliderect(block.rect) for block in self.walls]):
+            return True
+        return False
+
+    def trap_collision(self, x, y):
+        player = Player(x, y)
+        if any([player.get_rect().colliderect(block.rect) for block in self.traps]):
+            return True
         return False
 
 
@@ -29,7 +63,7 @@ class DayLevel(Level):
     background = pygame.image.load('data/background/daybackground.png')
 
     def __init__(self):
-        super().__init__((30, 313), (1248, 254))
+        super().__init__((35, 200), (1248, 254))
         self.load_lvl()
 
     def load_lvl(self):
@@ -40,6 +74,12 @@ class DayLevel(Level):
             tile, x, y = block.split(';')
             pos = (int(x) * 2, int(y) * 2)
             self.add_block('data/tiles/day/%s.png' % tile, pos)
+            if tile in ('platform', 'grassblock'):
+                self.add_floor('data/tiles/day/%s.png' % tile, pos)
+            elif tile == 'block':
+                self.add_wall('data/tiles/day/%s.png' % tile, pos)
+            elif tile == 'thorn':
+                self.add_trap('data/tiles/day/%s.png' % tile, pos)
 
 
 class EveningLevel(Level):
@@ -57,6 +97,12 @@ class EveningLevel(Level):
             tile, x, y = block.split(';')
             pos = (int(x) * 2, int(y) * 2)
             self.add_block('data/tiles/evening/%s.png' % tile, pos)
+            if tile in ('platform', 'grassblock'):
+                self.add_floor('data/tiles/evening/%s.png' % tile, pos)
+            elif tile == 'block':
+                self.add_wall('data/tiles/evening/%s.png' % tile, pos)
+            elif tile == 'thorn':
+                self.add_trap('data/tiles/evening/%s.png' % tile, pos)
 
 
 class NightLevel(Level):
@@ -74,14 +120,33 @@ class NightLevel(Level):
             tile, x, y = block.split(';')
             pos = (int(x) * 2, int(y) * 2)
             self.add_block('data/tiles/night/%s.png' % tile, pos)
+            if tile in ('platform', 'grassblock'):
+                self.add_floor('data/tiles/night/%s.png' % tile, pos)
+            elif tile == 'block':
+                self.add_wall('data/tiles/night/%s.png' % tile, pos)
+            elif tile == 'thorn':
+                self.add_trap('data/tiles/night/%s.png' % tile, pos)
 
 
 class Block:
     def __init__(self, tile, pos):
         self.image = pygame.image.load(tile)
-        self.image = pygame.transform.scale(self.image, tuple(map(lambda i: i * 2, self.image.get_rect()[2:4])))
         self.pos = pos
-        self.rect = pygame.Rect(*self.pos, *self.image.get_rect()[2:4])
+        x, y, width, height = self.image.get_rect()
+        self.image = pygame.transform.scale(self.image, (width * 2, height * 2))
+        self.rect = pygame.Rect(*self.pos, width * 2, height * 2)
+
+
+class Wall(Block):
+    pass
+
+
+class Floor(Block):
+    pass
+
+
+class Trap(Block):
+    pass
 
 
 class Player:
@@ -98,15 +163,17 @@ class Player:
     climbjump_l = [pygame.image.load('data/animation/climbjump_l/%s.gif' % i) for i in range(6)]
     climbslide_r = [pygame.image.load('data/animation/climbslide_r/0.png')]
     climbslide_l = [pygame.image.load('data/animation/climbslide_l/0.png')]
+    deadfall_r = [pygame.image.load('data/animation/deadfall_r/0.png')]
+    deadfall_l = [pygame.image.load('data/animation/deadfall_l/0.png')]
 
     def __init__(self, x, y):
         self.x = x
         self.y = y
+        self.vx = 5
+        self.vy = 0
         self.last_action = None
         self.change_action('idle_r')
-        self.vx = 5
-        self.vy = -11
-        self.jump_time = 0
+        self.hp = 1
 
     def change_action(self, action):
         if action == 'idle_r':
@@ -133,6 +200,10 @@ class Player:
             self.action = Player.climbslide_r
         elif action == 'climbslide_l':
             self.action = Player.climbslide_l
+        elif action == 'deadfall_r':
+            self.action = Player.deadfall_r
+        elif action == 'deadfall_l':
+            self.action = Player.deadfall_l
 
         if action != self.last_action:
             self.anim_count = 0
@@ -147,8 +218,13 @@ class Player:
                 self.count = self.anim_count // self.divider
         self.last_action = action
 
+    def foot_rect(self):
+        _, __, width, height = self.action[self.count].get_rect()
+        return pygame.Rect(self.x, self.y + height - 1, width * 2, 2)
+
     def get_rect(self):
-        return pygame.Rect(self.x, self.y, *self.action[self.count].get_rect()[2:4])
+        _, __, width, height = self.action[self.count].get_rect()
+        return pygame.Rect(self.x, self.y, width * 2, height * 2)
 
     def update(self):
         return self.action[self.count]
