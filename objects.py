@@ -3,23 +3,35 @@ import pygame
 FPS = 60
 
 
-class Level:
+class Level(pygame.sprite.Group):
     def __init__(self, start, end):
+        super().__init__()
         self.start, self.end = start, end
         self.blocks, self.traps = set(), set()
-        self.floors = {Floor(0, 0, 1240), Floor(424, 0, 1240)}
-        self.walls = {Wall(0, 0, 424), Wall(1240, 0, 424)}
+        self.floors = {Floor(0, 0, 1240, self), Floor(424, 0, 1240, self)}
+        self.walls = {Wall(0, 0, 424, self), Wall(1240, 0, 424, self)}
 
     def add_block(self, tile, pos):
-        block = Block(tile, pos)
-        self.blocks.append(block)
+        block = Block(tile, pos, self)
+        self.blocks.add(block)
+
+        x1, y1, width, height = block.rect
+        self.add_wall(x1, y1, y1 + height)
+        self.add_wall(x1 + width, y1, y1 + height)
+        self.add_floor(y1, x1, x1 + width)
+        self.add_floor(y1 + height, x1, x1 + width)
 
     def add_trap(self, tile, pos):
-        block = Trap(tile, pos)
-        self.traps.append(block)
+        block = Trap(tile, pos, self)
+        self.traps.add(block)
 
-    def add_wall(self, x, y1, y2, group=None):
-        pass
+    def add_wall(self, x, y1, y2):
+        wall = Wall(x, y1, y2, self)
+        self.walls.add(wall)
+
+    def add_floor(self, y, x1, x2):
+        floor = Floor(y, x1, x2, self)
+        self.floors.add(floor)
 
     def spawn_player(self):
         self.player = Player(*self.start)
@@ -37,15 +49,8 @@ class DayLevel(Level):
             self.map = map(lambda line: line.rstrip(), file.readlines())
 
         for block in self.map:
-            tile, x, y = block.split(';')
-            pos = (int(x) * 2, int(y) * 2)
+            tile, *pos = block.split(';')
             self.add_block('data/tiles/day/%s.png' % tile, pos)
-            if tile in ('platform', 'grassblock'):
-                self.add_floor('data/tiles/day/%s.png' % tile, pos)
-            elif tile == 'block':
-                self.add_wall('data/tiles/day/%s.png' % tile, pos)
-            elif tile == 'thorn':
-                self.add_trap('data/tiles/day/%s.png' % tile, pos)
 
 
 class EveningLevel(Level):
@@ -60,15 +65,8 @@ class EveningLevel(Level):
             self.map = map(lambda line: line.rstrip(), file.readlines())
 
         for block in self.map:
-            tile, x, y = block.split(';')
-            pos = (int(x) * 2, int(y) * 2)
-            self.add_block('data/tiles/evening/%s.png' % tile, pos)
-            if tile in ('platform', 'grassblock'):
-                self.add_floor('data/tiles/evening/%s.png' % tile, pos)
-            elif tile == 'block':
-                self.add_wall('data/tiles/evening/%s.png' % tile, pos)
-            elif tile == 'thorn':
-                self.add_trap('data/tiles/evening/%s.png' % tile, pos)
+            tile, *pos = block.split(';')
+            self.add_block('data/tiles/day/%s.png' % tile, pos)
 
 
 class NightLevel(Level):
@@ -83,20 +81,13 @@ class NightLevel(Level):
             self.map = map(lambda line: line.rstrip(), file.readlines())
 
         for block in self.map:
-            tile, x, y = block.split(';')
-            pos = (int(x) * 2, int(y) * 2)
-            self.add_block('data/tiles/night/%s.png' % tile, pos)
-            if tile in ('platform', 'grassblock'):
-                self.add_floor('data/tiles/night/%s.png' % tile, pos)
-            elif tile == 'block':
-                self.add_wall('data/tiles/night/%s.png' % tile, pos)
-            elif tile == 'thorn':
-                self.add_trap('data/tiles/night/%s.png' % tile, pos)
+            tile, *pos = block.split(';')
+            self.add_block('data/tiles/day/%s.png' % tile, pos)
 
 
 class Block(pygame.sprite.Sprite):
-    def __init__(self, tile, pos):
-        super().__init__()
+    def __init__(self, tile, pos, group=None):
+        super().__init__(group)
         self.image = pygame.transform.scale2x(pygame.image.load(tile))
         self.rect = self.image.get_rect()
         self.rect.x, self.rect.y = pos
@@ -125,7 +116,7 @@ class Idle(pygame.sprite.Sprite):
     left = [pygame.transform.flip(im, True, False) for im in right]
     length = 20
 
-    def __init__(self, right=True, group=None):
+    def __init__(self, right=True, group=Player):
         super().__init__(group)
         self.name = 'idle'
         self.images = Idle.right if right else Idle.left
@@ -143,7 +134,7 @@ class Run(pygame.sprite.Sprite):
     left = [pygame.transform.flip(im, True, False) for im in right]
     length = 12
 
-    def __init__(self, right=True, group=None):
+    def __init__(self, right=True, group=Player):
         super().__init__(group)
         self.name = 'run'
         self.images = Run.right if right else Run.left
@@ -160,7 +151,7 @@ class Jump(pygame.sprite.Sprite):
     right = pygame.image.load('data/animation/jump/0.png')
     left = pygame.transform.flip(right, True, False)
 
-    def __init__(self, right=True, group=None):
+    def __init__(self, right=True, group=Player):
         super().__init__(group)
         self.name = 'jump'
         self.image = Jump.right if right else Jump.left
@@ -175,7 +166,7 @@ class Bounce(pygame.sprite.Sprite):
     left = [pygame.transform.flip(im, True, False) for im in right]
     length = 6
 
-    def __init__(self, right=True, group=None):
+    def __init__(self, right=True, group=Player):
         super().__init__(group)
         self.name = 'bounce'
         self.images = Bounce.right if right else Bounce.left
@@ -192,7 +183,7 @@ class Dead(pygame.sprite.Sprite):
     right = pygame.image.load('data/animation/dead/0.png')
     left = pygame.transform.flip(right, True, False)
 
-    def __init__(self, right=True, group=None):
+    def __init__(self, right=True, group=Player):
         super().__init__(group)
         self.name = 'dead'
         self.image = Dead.right if right else Dead.left
@@ -206,7 +197,7 @@ class Hold(pygame.sprite.Sprite):
     right = pygame.image.load('data/animation/hold/0.png')
     left = pygame.transform.flip(right, True, False)
 
-    def __init__(self, right=True, group=None):
+    def __init__(self, right=True, group=Player):
         super().__init__(group)
         self.name = 'hold'
         self.image = Dead.right if right else Dead.left
@@ -222,6 +213,7 @@ class Player(pygame.sprite.Group):
         self.vx, self.vy = 5, 0
         self.hp = 1
 
+        self.add(Idle, Run, Jump, Bounce, Dead, Hold)
         self.sprite = None
         self.update(x, y, 'idle', True)
 
