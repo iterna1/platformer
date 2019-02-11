@@ -5,7 +5,7 @@ def variables():
     global fps, right, left, jump, hold, climbjump, level, levels, clock, size, width, height, n
     clock = pygame.time.Clock()
     size = width, height = 1280, 424
-    fps = 30
+    fps = 60
     levels = list((DayLevel(), EveningLevel(), NightLevel()))
     n = -1
     right, left, jump, hold, climbjump = False, False, False, False, False
