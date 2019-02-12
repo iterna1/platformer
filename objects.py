@@ -1,4 +1,5 @@
 import pygame
+from itertools import cycle
 
 FPS = 60
 
@@ -7,31 +8,33 @@ class Level(pygame.sprite.Group):
     def __init__(self, start, end):
         super().__init__()
         self.start, self.end = start, end
-        self.blocks, self.traps = set(), set()
-        self.floors = {Floor(0, 0, 1240, self), Floor(424, 0, 1240, self)}
-        self.walls = {Wall(0, 0, 424, self), Wall(1240, 0, 424, self)}
+        self.blocks, self.traps, self.floors, self.walls = set(), set(), set(), set()
+        self.add_floors([0, 0, 1240], [424, 0, 1240])
+        self.add_walls([0, 0, 424], [1240, 0, 424])
 
     def add_block(self, tile, pos):
         block = Block(tile, pos, self)
         self.blocks.add(block)
 
         x1, y1, width, height = block.rect
-        self.add_wall(x1, y1, y1 + height)
-        self.add_wall(x1 + width, y1, y1 + height)
-        self.add_floor(y1, x1, x1 + width)
-        self.add_floor(y1 + height, x1, x1 + width)
+        self.add_walls([x1, y1, y1 + height], [x1 + width, y1, y1 + height])
+        self.add_floors([y1, x1, x1 + width], [y1 + height, x1, x1 + width])
 
     def add_trap(self, tile, pos):
         block = Trap(tile, pos, self)
         self.traps.add(block)
 
-    def add_wall(self, x, y1, y2):
-        wall = Wall(x, y1, y2, self)
-        self.walls.add(wall)
+    def add_walls(self, *args):
+        for xyy in args:
+            x, y1, y2 = xyy
+            wall = Wall(x, y1, y2, self)
+            self.walls.add(wall)
 
-    def add_floor(self, y, x1, x2):
-        floor = Floor(y, x1, x2, self)
-        self.floors.add(floor)
+    def add_floors(self, *args):
+        for yxx in args:
+            y, x1, x2 = yxx
+            floor = Floor(y, x1, x2, self)
+            self.floors.add(floor)
 
     def spawn_player(self):
         self.player = Player(*self.start)
@@ -50,7 +53,7 @@ class DayLevel(Level):
 
         for block in self.map:
             tile, *pos = block.split(';')
-            self.add_block('data/tiles/day/%s.png' % tile, pos)
+            self.add_block('data/tiles/day/%s.png' % tile, map(int, pos))
 
 
 class EveningLevel(Level):
@@ -66,7 +69,7 @@ class EveningLevel(Level):
 
         for block in self.map:
             tile, *pos = block.split(';')
-            self.add_block('data/tiles/day/%s.png' % tile, pos)
+            self.add_block('data/tiles/evening/%s.png' % tile, map(int, pos))
 
 
 class NightLevel(Level):
@@ -82,7 +85,7 @@ class NightLevel(Level):
 
         for block in self.map:
             tile, *pos = block.split(';')
-            self.add_block('data/tiles/day/%s.png' % tile, pos)
+            self.add_block('data/tiles/day/%s.png' % tile, map(int, pos))
 
 
 class Block(pygame.sprite.Sprite):
@@ -116,17 +119,16 @@ class Idle(pygame.sprite.Sprite):
     left = [pygame.transform.flip(im, True, False) for im in right]
     length = 20
 
-    def __init__(self, right=True, group=Player):
+    def __init__(self, group=None):
         super().__init__(group)
         self.name = 'idle'
-        self.images = Idle.right if right else Idle.left
-        self.animcount = 0
+        self.animcount = cycle([f // (FPS // Idle.length) for f in range(FPS)])
 
-    def update(self, x, y):
-        self.image = self.images[self.animcount // (FPS // Idle.length)]
+    def update(self, x, y, right=True):
+        self.images = Idle.right if right else Idle.left
+        self.image = self.images[next(self.animcount)]
         self.rect = self.image.get_rect()
         self.rect.x, self.rect.y = x, y
-        self.animcount += 1 if self.animcount < FPS else -self.animcount
 
 
 class Run(pygame.sprite.Sprite):
@@ -134,30 +136,29 @@ class Run(pygame.sprite.Sprite):
     left = [pygame.transform.flip(im, True, False) for im in right]
     length = 12
 
-    def __init__(self, right=True, group=Player):
+    def __init__(self, group=None):
         super().__init__(group)
         self.name = 'run'
-        self.images = Run.right if right else Run.left
-        self.animcount = 0
+        self.animcount = cycle([f // (FPS // Run.length) for f in range(FPS)])
 
-    def update(self, x, y):
-        self.image = self.images[self.animcount // (FPS // Run.length)]
+    def update(self, x, y, right=True):
+        self.images = Run.right if right else Run.left
+        self.image = self.images[next(self.animcount)]
         self.rect = self.image.get_rect()
         self.rect.x, self.rect.y = x, y
-        self.animcount += 1 if self.animcount < FPS else -self.animcount
 
 
 class Jump(pygame.sprite.Sprite):
     right = pygame.image.load('data/animation/jump/0.png')
     left = pygame.transform.flip(right, True, False)
 
-    def __init__(self, right=True, group=Player):
+    def __init__(self, group=None):
         super().__init__(group)
         self.name = 'jump'
-        self.image = Jump.right if right else Jump.left
-        self.rect = self.image.get_rect()
 
-    def update(self, x, y):
+    def update(self, x, y, right=True):
+        self.image = Dead.right if right else Dead.left
+        self.rect = self.image.get_rect()
         self.rect.x, self.rect.y = x, y
 
 
@@ -166,30 +167,29 @@ class Bounce(pygame.sprite.Sprite):
     left = [pygame.transform.flip(im, True, False) for im in right]
     length = 6
 
-    def __init__(self, right=True, group=Player):
+    def __init__(self, group=None):
         super().__init__(group)
         self.name = 'bounce'
-        self.images = Bounce.right if right else Bounce.left
-        self.animcount = 0
+        self.animcount = cycle([f // (FPS // Bounce.length) for f in range(FPS)])
 
-    def update(self, x, y):
-        self.image = self.images[self.animcount // (FPS // Bounce.length)]
+    def update(self, x, y, right=True):
+        self.images = Bounce.right if right else Bounce.left
+        self.image = self.images[next(self.animcount)]
         self.rect = self.image.get_rect()
         self.rect.x, self.rect.y = x, y
-        self.animcount += 1 if self.animcount < FPS else -self.animcount
 
 
 class Dead(pygame.sprite.Sprite):
     right = pygame.image.load('data/animation/dead/0.png')
     left = pygame.transform.flip(right, True, False)
 
-    def __init__(self, right=True, group=Player):
+    def __init__(self, group=None):
         super().__init__(group)
         self.name = 'dead'
+
+    def update(self, x, y, right=True):
         self.image = Dead.right if right else Dead.left
         self.rect = self.image.get_rect()
-
-    def update(self, x, y):
         self.rect.x, self.rect.y = x, y
 
 
@@ -197,30 +197,29 @@ class Hold(pygame.sprite.Sprite):
     right = pygame.image.load('data/animation/hold/0.png')
     left = pygame.transform.flip(right, True, False)
 
-    def __init__(self, right=True, group=Player):
+    def __init__(self, group=None):
         super().__init__(group)
         self.name = 'hold'
+
+    def update(self, x, y, right=True):
         self.image = Dead.right if right else Dead.left
         self.rect = self.image.get_rect()
-
-    def update(self, x, y):
         self.rect.x, self.rect.y = x, y
 
 
 class Player(pygame.sprite.Group):
     def __init__(self, x, y):
         super().__init__()
-        self.vx, self.vy = 5, 0
+        self.vx, self.vy = 0, 0
         self.hp = 1
 
-        self.add(Idle, Run, Jump, Bounce, Dead, Hold)
-        self.sprite = None
+        self.sprites = [Idle(self), Run(self), Jump(self), Bounce(self), Dead(self), Hold(self)]
         self.update(x, y, 'idle', True)
 
     def update(self, x, y, action, right=True):
         #  Тут нужна проверка на столкновения
-        for sprite in self.sprites():
+        for sprite in self.sprites:
             if sprite.name == action:
                 sprite.update(x, y, right)
                 self.sprite = sprite
-                return sprite
+        self.vx, self.vy = 0, 0
