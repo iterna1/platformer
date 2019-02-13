@@ -2,15 +2,19 @@ import pygame
 from itertools import cycle
 
 FPS = 60
+ANIMATION_SPEED = FPS // 3  # lower == faster | FPS // N -> N animation cycles in 60 frames
+SIZE = WIDTH, HEIGHT = 1280, 424  # screen size
 
 
 class Level(pygame.sprite.Group):
-    def __init__(self, start, end):
+    def __init__(self, background, start, end):
         super().__init__()
+        self.background = pygame.image.load(background)
         self.start, self.end = start, end
-        self.blocks, self.traps, self.floors, self.walls = set(), set(), set(), set()
-        self.add_floors([0, 0, 1240], [424, 0, 1240])
-        self.add_walls([0, 0, 424], [1240, 0, 424])
+        self.blocks, self.traps = pygame.sprite.Group(), pygame.sprite.Group()
+        self.floors, self.walls = pygame.sprite.Group(), pygame.sprite.Group()
+
+        self.add_walls([0, 0, HEIGHT - 2], [WIDTH - 2, 0, HEIGHT - 2])
 
     def add_block(self, tile, pos):
         block = Block(tile, pos, self)
@@ -21,30 +25,28 @@ class Level(pygame.sprite.Group):
         self.add_floors([y1, x1, x1 + width], [y1 + height, x1, x1 + width])
 
     def add_trap(self, tile, pos):
-        block = Trap(tile, pos, self)
-        self.traps.add(block)
+        Trap(tile, pos, self, self.traps)
 
     def add_walls(self, *args):
         for xyy in args:
-            x, y1, y2 = xyy
-            wall = Wall(x, y1, y2, self)
-            self.walls.add(wall)
+            Wall(*xyy, self, self.walls)  # if self in parameters, borders will be shown
 
     def add_floors(self, *args):
         for yxx in args:
-            y, x1, x2 = yxx
-            floor = Floor(y, x1, x2, self)
-            self.floors.add(floor)
+            Floor(*yxx, self, self.floors)  # # if self in parameters, borders will be shown
 
     def spawn_player(self):
-        self.player = Player(*self.start)
+        self.player = Player(*self.start, self)
+
+    def draw(self, surface):
+        surface.blit(self.background, (0, 0))
+        for sprite in self.sprites():
+            surface.blit(sprite.image, (sprite.rect.x, sprite.rect.y))
 
 
 class DayLevel(Level):
-    background = pygame.image.load('data/background/daybackground.png')
-
     def __init__(self):
-        super().__init__((35, 200), (1248, 254))
+        super().__init__('data/background/daybackground.png', (35, 200), (1248, 254))
         self.load_lvl()
 
     def load_lvl(self):
@@ -57,10 +59,8 @@ class DayLevel(Level):
 
 
 class EveningLevel(Level):
-    background = pygame.image.load('data/background/eveningbackground.png')
-
     def __init__(self):
-        super().__init__((30, 313), (1248, 254))
+        super().__init__('data/background/eveningbackground.png', (30, 313), (1248, 254))
         self.load_lvl()
 
     def load_lvl(self):
@@ -73,10 +73,8 @@ class EveningLevel(Level):
 
 
 class NightLevel(Level):
-    background = pygame.image.load('data/background/nightbackground.png')
-
     def __init__(self):
-        super().__init__((30, 313), (1248, 254))
+        super().__init__('data/background/nightbackground.png', (30, 313), (1248, 254))
         self.load_lvl()
 
     def load_lvl(self):
@@ -89,9 +87,9 @@ class NightLevel(Level):
 
 
 class Block(pygame.sprite.Sprite):
-    def __init__(self, tile, pos, group=None):
-        super().__init__(group)
-        self.image = pygame.transform.scale2x(pygame.image.load(tile))
+    def __init__(self, tile, pos, *groups):
+        super().__init__(*groups)
+        self.image = pygame.image.load(tile)
         self.rect = self.image.get_rect()
         self.rect.x, self.rect.y = pos
 
@@ -101,15 +99,15 @@ class Trap(Block):
 
 
 class Wall(pygame.sprite.Sprite):
-    def __init__(self, x, y1, y2, group=None):
-        super().__init__(group)
+    def __init__(self, x, y1, y2, *groups):
+        super().__init__(*groups)
         self.image = pygame.Surface([2, y2 - y1])
         self.rect = pygame.Rect(x, y1, 2, y2 - y1)
 
 
 class Floor(pygame.sprite.Sprite):
-    def __init__(self, y, x1, x2, group=None):
-        super().__init__(group)
+    def __init__(self, y, x1, x2, *groups):
+        super().__init__(*groups)
         self.image = pygame.Surface([x2 - x1, 2])
         self.rect = pygame.Rect(x1, y, x2 - x1, 2)
 
@@ -119,16 +117,15 @@ class Idle(pygame.sprite.Sprite):
     left = [pygame.transform.flip(im, True, False) for im in right]
     length = 20
 
-    def __init__(self, group=None):
-        super().__init__(group)
+    def __init__(self, *groups):
+        super().__init__(*groups)
         self.name = 'idle'
-        self.animcount = cycle([f // (FPS // Idle.length) for f in range(FPS)])
+        self.animcount = cycle([int(f / (ANIMATION_SPEED / Idle.length)) for f in range(ANIMATION_SPEED)])
 
-    def update(self, x, y, right=True):
+    def update(self, right=True):
         self.images = Idle.right if right else Idle.left
         self.image = self.images[next(self.animcount)]
         self.rect = self.image.get_rect()
-        self.rect.x, self.rect.y = x, y
 
 
 class Run(pygame.sprite.Sprite):
@@ -136,30 +133,28 @@ class Run(pygame.sprite.Sprite):
     left = [pygame.transform.flip(im, True, False) for im in right]
     length = 12
 
-    def __init__(self, group=None):
-        super().__init__(group)
+    def __init__(self, *groups):
+        super().__init__(*groups)
         self.name = 'run'
-        self.animcount = cycle([f // (FPS // Run.length) for f in range(FPS)])
+        self.animcount = cycle([int(f / (ANIMATION_SPEED / Run.length)) for f in range(ANIMATION_SPEED)])
 
-    def update(self, x, y, right=True):
+    def update(self, right=True):
         self.images = Run.right if right else Run.left
         self.image = self.images[next(self.animcount)]
         self.rect = self.image.get_rect()
-        self.rect.x, self.rect.y = x, y
 
 
 class Jump(pygame.sprite.Sprite):
     right = pygame.image.load('data/animation/jump/0.png')
     left = pygame.transform.flip(right, True, False)
 
-    def __init__(self, group=None):
-        super().__init__(group)
+    def __init__(self, *groups):
+        super().__init__(*groups)
         self.name = 'jump'
 
-    def update(self, x, y, right=True):
+    def update(self, right=True):
         self.image = Dead.right if right else Dead.left
         self.rect = self.image.get_rect()
-        self.rect.x, self.rect.y = x, y
 
 
 class Bounce(pygame.sprite.Sprite):
@@ -167,59 +162,59 @@ class Bounce(pygame.sprite.Sprite):
     left = [pygame.transform.flip(im, True, False) for im in right]
     length = 6
 
-    def __init__(self, group=None):
-        super().__init__(group)
+    def __init__(self, *groups):
+        super().__init__(*groups)
         self.name = 'bounce'
-        self.animcount = cycle([f // (FPS // Bounce.length) for f in range(FPS)])
+        self.animcount = cycle([int(f / (ANIMATION_SPEED / Run.length)) for f in range(ANIMATION_SPEED)])
 
-    def update(self, x, y, right=True):
+    def update(self, right=True):
         self.images = Bounce.right if right else Bounce.left
         self.image = self.images[next(self.animcount)]
         self.rect = self.image.get_rect()
-        self.rect.x, self.rect.y = x, y
 
 
 class Dead(pygame.sprite.Sprite):
     right = pygame.image.load('data/animation/dead/0.png')
     left = pygame.transform.flip(right, True, False)
 
-    def __init__(self, group=None):
-        super().__init__(group)
+    def __init__(self, *groups):
+        super().__init__(*groups)
         self.name = 'dead'
 
-    def update(self, x, y, right=True):
+    def update(self, right=True):
         self.image = Dead.right if right else Dead.left
         self.rect = self.image.get_rect()
-        self.rect.x, self.rect.y = x, y
 
 
 class Hold(pygame.sprite.Sprite):
     right = pygame.image.load('data/animation/hold/0.png')
     left = pygame.transform.flip(right, True, False)
 
-    def __init__(self, group=None):
-        super().__init__(group)
+    def __init__(self, *groups):
+        super().__init__(*groups)
         self.name = 'hold'
 
-    def update(self, x, y, right=True):
+    def update(self, right=True):
         self.image = Dead.right if right else Dead.left
         self.rect = self.image.get_rect()
-        self.rect.x, self.rect.y = x, y
 
 
-class Player(pygame.sprite.Group):
-    def __init__(self, x, y):
-        super().__init__()
+class Player(pygame.sprite.Sprite):
+    def __init__(self, x, y, groups=None):
+        super().__init__(groups)
         self.vx, self.vy = 0, 0
         self.hp = 1
 
-        self.sprites = [Idle(self), Run(self), Jump(self), Bounce(self), Dead(self), Hold(self)]
-        self.update(x, y, 'idle', True)
+        self.sprites = [Idle(), Run(), Jump(), Bounce(), Dead(), Hold()]
+        self.update('idle', True)
+        self.rect.x, self.rect.y = x, y
 
-    def update(self, x, y, action, right=True):
+    def update(self, action, right=True):
         #  Тут нужна проверка на столкновения
+        self.sprite = action, right
         for sprite in self.sprites:
             if sprite.name == action:
-                sprite.update(x, y, right)
-                self.sprite = sprite
-        self.vx, self.vy = 0, 0
+                sprite.update(right)
+                self.rect = sprite.rect.move(self.vx, self.vy)
+                self.image = sprite.image
+

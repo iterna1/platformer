@@ -1,12 +1,5 @@
 from objects import *
-
-
-def variables():
-    global fps, levels, clock, size, width, height
-    clock = pygame.time.Clock()
-    size = width, height = 1280, 424
-    fps = 60
-    levels = iter((DayLevel(), EveningLevel(), NightLevel()))
+from interactions import *
 
 
 def game_level():
@@ -28,64 +21,79 @@ def event_checker():
                 level.spawn_player()
 
     keys = pygame.key.get_pressed()
-    right, left, jump = False, False, False
+    right, left, space = False, False, False
     if keys[pygame.K_RIGHT]:
         right = True
     elif keys[pygame.K_LEFT]:
         left = True
-    if keys[pygame.K_SPACE] and not jump:
-        jump = True
-    return right, left, jump
+    if keys[pygame.K_SPACE]:
+        space = True
+    return right, left, space
 
 
-def movements(k_right, k_left, k_jump):
-    right = True
-    action = level.player.sprite.name
-    if k_jump:
-        level.player.vy = -2
+def movements(k_right, k_left, k_space):
+    action, right = level.player.sprite
+
+    if floor_collision(level):
+        level.player.vy = 0
+        if k_space:
+            level.player.vy = -5
+            action = 'jump'
+        if k_right:
+            level.player.vx = 2
+            action = 'run'
+            right = True
+        if k_left:
+            level.player.vx = -2
+            action = 'run'
+            right = False
+    elif wall_collision(level):
+        self.vy = 1
+
+    elif trap_collision(level):
+        pass
+
+    else:
+        level.player.vy += 1
         action = 'jump'
-    if k_right:
-        level.player.vx = 1
-        action = 'run'
-        right = True
-    elif k_left:
-        level.player.vx = -1
-        action = 'run'
-        right = False
-
-    level.player.sprite.rect.move_ip(level.player.vx, level.player.vy)
-    return action, right
+        if k_right:
+            level.player.vx = 2
+            right = True
+        elif k_left:
+            level.player.vx = -2
+            right = False
+    level.update(action, right)
 
 
-def drawing(action, right):
+def drawing():
     # Отрисовка уровня
-    level.update()
     level.draw(screen)
-    # Отрисовка игрока
-    level.player.update(level.player.sprite.rect.x + level.player.vx, level.player.sprite.rect.y + level.player.vy,
-                        action, right)
-    screen.blit(level.player.sprite.image, (level.player.sprite.rect.x, level.player.sprite.rect.y))
 
 
 def esc_menu():
-    global run
-    run = False
+    global ingame
+    ingame = False
 
 
 pygame.init()
+clock = pygame.time.Clock()
 
-variables()
-screen = pygame.display.set_mode(size)
-pygame.display.set_caption('')
+screen = pygame.display.set_mode(SIZE)
+pygame.display.set_caption('game')
+
+levels = iter((DayLevel(), EveningLevel(), NightLevel()))
 level = game_level()
 level.spawn_player()
 
 # main loop
 ingame = True
 while ingame:
-    drawing(*movements(*event_checker()))
+    # updating level
+    movements(*event_checker())  # event checker returns buttons which are pressed
+    # drawing
+    drawing()
     # updating frame
     pygame.display.flip()
-    clock.tick(fps)
+    clock.tick(FPS)
 
 pygame.quit()
