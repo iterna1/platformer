@@ -193,7 +193,7 @@ class Player(pygame.sprite.Sprite):
         self.vx, self.vy = 0, 0
         self.hp = 1
 
-        self.sprites = [Idle, Run, Jump, Bounce, Dead, Hold]
+        self.sprites = [Idle(), Run(), Jump(), Bounce(), Dead(), Hold()]
         self.right = True
         self.update('idle')
 
@@ -210,9 +210,15 @@ class Player(pygame.sprite.Sprite):
 
     def update(self, action):
         self.change_facing()
+        try:
+            if action != self.sprite.name:
+                self.sprites = [Idle(), Run(), Jump(), Bounce(), Dead(), Hold()]
+
+        except AttributeError:
+            pass
         for sprite in self.sprites:
             if sprite.name == action:
-                self.sprite = sprite()
+                self.sprite = sprite
                 self.sprite.update(self.right)
                 self.image = self.sprite.image
                 self.rect = self.image.get_rect()
@@ -220,32 +226,88 @@ class Player(pygame.sprite.Sprite):
         self.move_ip()
 
 
-class Button(pygame.sprite.Sprite):
-    def __init__(self, color, x, y, width, height):
-        self.button = pygame.Surface((width, height))
-        self.button.fill(color)
-        pygame.draw.rect(self.button, (100, 100, 100), (0, 0, width, height), 2)
-        self.rect = self.button.get_rect()
-        self.rect.x = x
-        self.rect.y = y
-        self.font = None
+class Label(pygame.sprite.Sprite):
+    def __init__(self, text, font_file, font_size, label_rect, bg_color=(0, 0, 0), txt_color=(255, 255, 255)):
+        super().__init__()
+        self.text = text
+        self.font_size = font_size
+        self.font_file = font_file
+        self.image = pygame.Surface(label_rect)
+        self.rect = self.image.get_rect()
+        self.txt_color = txt_color
+        self.bg_color = bg_color
+        self.set_image(text, bg_color, txt_color)
 
     def set_font(self, file, size):
         self.size = size
         self.font = pygame.font.Font(file, size)
 
-    def set_text(self, text, color=(255, 255, 255)):
-        if self.font is not None:
-            text = self.font.render(text, 1, color)
-            text_x = self.button.get_width() // 2 - text.get_width() // 2
-            text_y = self.button.get_height() // 2 - text.get_height() // 2
-            self.button.blit(text, (text_x, text_y))
+    def set_text(self, text, color):
+        text = self.font.render(text, 1, color)
+        self.image.blit(text, (0, 0))
+
+    def set_image(self, text, bg_color, txt_color):
+        self.image.fill(pygame.Color(*bg_color))
+        self.text = text
+        self.set_font(self.font_file, self.font_size)
+        self.set_text(text, pygame.Color(*txt_color))
+
+
+class Buttons(pygame.sprite.Group):
+    def __init__(self, *sprites):
+        super().__init__(*sprites)
+
+    def check_pressed(self, pos):
+        for sprite in self.sprites():
+            result = sprite.pressed(pos)
+            if result:
+                sprite.deep()
+                return result
+
+
+class Button(pygame.sprite.Sprite):
+    def __init__(self, texts, text_size, bg_color, text_color, rect):
+        super().__init__()
+        x, y, width, height = rect
+        self.bg_color = pygame.Color(*bg_color)
+        self.text_color = pygame.Color(*text_color)
+        self.bg_hsva = self.bg_color.hsva
+        self.txt_hsva = self.text_color.hsva
+
+        self.image = pygame.Surface((width, height))
+        self.image.fill((0, 0, 0))
+
+        self.rect = self.image.get_rect()
+        self.rect.x = x
+        self.rect.y = y
+
+        self.texts = cycle(texts)
+        self.text = Label(next(self.texts), 'data/fonts/font.ttf', text_size,
+                          (width - 8, height - 8), self.bg_color, text_color)
+        self.text_x, self.text_y = 4, 4  # self.rect.width // 2 - self.text.rect.width // 2, 4
+        self.image.blit(self.text.image, (self.text_x, self.text_y))
 
     def pressed(self, pos):
         if self.rect.collidepoint(pos):
-            self.update()
-            return True
-        return False
+            return self
+        return None
+
+    def deep(self):
+        # changing background color
+        hsv = self.bg_hsva
+        self.bg_color.hsva = (hsv[0], hsv[1], 0.6 * hsv[2], hsv[3])
+        # changing text color
+        hsv = self.txt_hsva
+        self.text_color.hsva = (hsv[0], hsv[1], 0.6 * hsv[2], hsv[3])
+
+        self.text.set_image(self.text.text, self.bg_color, self.text_color)
+
+    def high(self):
+        self.bg_color.hsva = self.bg_hsva
+        self.text_color.hsva = self.txt_hsva
+
+        self.text.set_image(self.text.text, self.bg_color, self.text_color)
 
     def update(self):
-        pass
+        self.image.fill((0, 0, 0))
+        self.image.blit(self.text.image, (self.text_x, self.text_y))

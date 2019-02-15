@@ -8,10 +8,10 @@ SIZE = WIDTH, HEIGHT = 1280, 424  # screen size
 
 pygame.init()
 clock = pygame.time.Clock()
+ingame = True
 
 screen = pygame.display.set_mode(SIZE)
-pygame.display.set_caption('game')
-ingame = True
+pygame.display.set_caption("The walkthrough")
 
 intro_text = ['Инструкция такова:',
               '    Вам необходимо пройти 3 уровня.',
@@ -20,10 +20,14 @@ intro_text = ['Инструкция такова:',
               '    Чем больше жизней вы сохраните', '    к концу игры, тем круче', '', '', '', '', ''
               '                                                                         '
               '[Чтобы начать, нажимите кнопку ENTER]']
-begin_fon = pygame.transform.scale(pygame.image.load('data/menu/instructions.jpg'), (WIDTH, HEIGHT))
-end_fon = None
+captions_text = ['THE END.']
 
-escape_fon = pygame.Surface([485, 300])
-escape_fon.fill((255, 204, 0))
+begin_fon = pygame.transform.scale(pygame.image.load('data/menu/instructions.jpg'), (WIDTH, HEIGHT))
+end_fon = pygame.Surface([1240, 1240])
+end_fon.fill((26, 10, 16))
+
+playing_music = False
+game_music = pygame.mixer.music.load('data/music/main_theme.mp3')
+volumes = cycle((100, 0))
 
 begin_screen_font = pygame.font.Font('data/fonts/font.ttf', 30)
