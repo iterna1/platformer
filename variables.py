@@ -3,7 +3,7 @@ import sys
 from itertools import cycle
 
 FPS = 60
-ANIMATION_SPEED = FPS // 3  # lower == faster | FPS // N -> N animation cycles in 60 frames
+ANIMATION_SPEED = FPS // 2  # lower == faster | FPS // N -> N animation cycles in 60 frames
 SIZE = WIDTH, HEIGHT = 1280, 424  # screen size
 
 pygame.init()

@@ -35,11 +35,11 @@ class Level(pygame.sprite.Group):
 
     def add_walls(self, *args):
         for xyy in args:
-            Wall(*xyy, self, self.walls)  # if self in parameters, borders will be shown
+            Wall(*xyy, self.walls)  # if self in parameters, borders will be shown
 
     def add_floors(self, *args):
         for yxx in args:
-            Floor(*yxx, self, self.floors)  # # if self in parameters, borders will be shown
+            Floor(*yxx, self.floors)  # # if self in parameters, borders will be shown
 
     def spawn_player(self):
         try:
@@ -57,7 +57,7 @@ class Level(pygame.sprite.Group):
 
 class DayLevel(Level):
     def __init__(self):
-        super().__init__('data/background/daybackground.png', (35, 300), (1248, 254))
+        super().__init__('data/background/daybackground.png', (14, 300), (1248, 254))
         self.load_lvl('day')
 
 
@@ -69,7 +69,7 @@ class EveningLevel(Level):
 
 class NightLevel(Level):
     def __init__(self):
-        super().__init__('data/background/nightbackground.png', (30, 313), (1248, 254))
+        super().__init__('data/background/nightbackground.png', (16, 32), (1248, 254))
         self.load_lvl('night')
 
 
@@ -140,7 +140,7 @@ class Jump(pygame.sprite.Sprite):
         super().__init__(*groups)
 
     def update(self, right=True):
-        self.image = Dead.right if right else Dead.left
+        self.image = Jump.right if right else Jump.left
         self.rect = self.image.get_rect()
 
 
@@ -182,7 +182,7 @@ class Hold(pygame.sprite.Sprite):
         super().__init__(*groups)
 
     def update(self, right=True):
-        self.image = Dead.right if right else Dead.left
+        self.image = Hold.right if right else Hold.left
         self.rect = self.image.get_rect()
 
 

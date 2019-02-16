@@ -107,7 +107,7 @@ def begin():
             terminate()
         elif event.type == pygame.KEYDOWN and event.key == pygame.K_RETURN:
             return
-        pygame.time.delay(50)
+        clock.tick(FPS)
 
 
 def mainloop():
@@ -123,7 +123,8 @@ def mainloop():
         else:
             pygame.mixer.music.unpause()
         # updating level
-        movements(*event_checker())
+        action = movements(*event_checker())
+        level.update(action)
         level.draw(screen)
         # updating frame
         pygame.display.flip()
@@ -137,35 +138,8 @@ def end():
 
 def movements(k_right, k_left, k_space):
     action = level.player.sprite.name
-    if floor_collision(level):
-        level.player.vy = 0
-        if k_space:
-            level.player.vy = -4
-            action = 'jump'
-        if k_right:
-            level.player.vx = 2
-            action = 'run'
-        if k_left:
-            level.player.vx = -2
-            action = 'run'
-    elif wall_collision(level):
-        level.player.vy = 1
-        action = 'hold'
 
-    elif trap_collision(level):
-        pass
-
-    else:
-        level.player.vy += 1
-        action = 'jump'
-        if k_right:
-            level.player.vx = 2
-        elif k_left:
-            level.player.vx = -2
-    wall_collision(level)
-    floor_collision(level)
-
-    level.update(action)
+    return action
 
 
 def event_checker():
@@ -217,7 +191,7 @@ def trap_collision(lvl):
 
 def main():
     global levels, level
-    levels = iter((DayLevel(), EveningLevel(), NightLevel()))
+    levels = iter((DayLevel(), NightLevel(), EveningLevel()))
     level = change_level()
     level.spawn_player()
 
