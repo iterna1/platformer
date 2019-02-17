@@ -124,7 +124,7 @@ def mainloop():
             pygame.mixer.music.unpause()
         # updating level
         action = movements(*event_checker())
-        level.update(action)
+        level.update(action, level)
         level.draw(screen)
         # updating frame
         pygame.display.flip()
@@ -134,12 +134,6 @@ def mainloop():
 
 def end():
     pass
-
-
-def movements(k_right, k_left, k_space):
-    action = level.player.sprite.name
-
-    return action
 
 
 def event_checker():
@@ -164,34 +158,43 @@ def event_checker():
     return right, left, space
 
 
-def wall_collision(lvl):
-    obj = pygame.sprite.spritecollideany(lvl.player, lvl.walls)
-    if obj is not None:
-        if lvl.player.vx < 0:
-            lvl.player.rect.x = obj.rect.x + 1
-        else:
-            lvl.player.rect.x = obj.rect.x - lvl.player.rect[2] - 1
-    return False if obj is None else True
+def movements(k_right, k_left, k_space):
+    action = level.player.sprite.name
+    if k_space:
+        if level.player.onGround:
+            action = 'jump'
+            level.player.vy = -level.player.jumpower
+            level.player.onGround = False
+        elif level.player.onWall:
+            action = 'bounce'
+            level.player.vy = -level.player.jumpower
+            level.player.vx = -level.player.jumpower if not level.player.right else level.player.jumpower
+            level.player.onGround = False
+    if k_right:
+        level.player.vx = 4
+        if level.player.onGround:
+            action = 'run'
+    elif k_left:
+        level.player.vx = -4
+        if level.player.onGround:
+            action = 'run'
+    else:
+        # if nothing among k_right and k_left is True
+        level.player.vx = 0
+        if level.player.onGround:
+            action = 'idle'
 
+    #  gravitation if not on the floor
+    if not level.player.onGround:
+        action = 'jump'
+        level.player.vy += level.gravity
 
-def floor_collision(lvl):
-    obj = pygame.sprite.spritecollideany(lvl.player, lvl.floors)
-    if obj is not None:
-        if lvl.player.vy < 0:
-            lvl.player.rect.y = obj.rect.y + 1
-        else:
-            lvl.player.rect.y = obj.rect.y - lvl.player.rect[3] - 1
-    return False if obj is None else True
-
-
-def trap_collision(lvl):
-    obj = pygame.sprite.spritecollideany(lvl.player, lvl.traps)
-    return False if obj is None else True
+    return action
 
 
 def main():
     global levels, level
-    levels = iter((DayLevel(), NightLevel(), EveningLevel()))
+    levels = iter((DayLevel(), EveningLevel(), NightLevel()))
     level = change_level()
     level.spawn_player()
 

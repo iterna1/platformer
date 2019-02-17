@@ -6,10 +6,10 @@ class Level(pygame.sprite.Group):
         super().__init__()
         self.background = pygame.image.load(background)
         self.start, self.end = start, end
-        self.blocks, self.traps = pygame.sprite.Group(), pygame.sprite.Group()
-        self.floors, self.walls = pygame.sprite.Group(), pygame.sprite.Group()
+        self.blocks, self.traps = [], []
+        self.floors, self.walls = [], []
 
-        self.add_walls([0, 0, HEIGHT - 2], [WIDTH - 2, 0, HEIGHT - 2])
+        self.gravity = 0.75
 
     def load_lvl(self, txt):
         with open('data/levels/%s.txt' % txt, 'r') as file:
@@ -17,29 +17,18 @@ class Level(pygame.sprite.Group):
 
         for block in self.map:
             tile, *pos = block.split(';')
-            if tile in ('grassblock', 'block'):
+            if tile == 'trap':
                 self.add_trap('data/tiles/%s/%s.png' % (txt, tile), map(int, pos))
             else:
                 self.add_block('data/tiles/%s/%s.png' % (txt, tile), map(int, pos))
 
     def add_block(self, tile, pos):
         block = Block(tile, pos, self)
-        self.blocks.add(block)
-
-        x1, y1, width, height = block.rect
-        self.add_walls([x1, y1, y1 + height], [x1 + width, y1, y1 + height])
-        self.add_floors([y1, x1, x1 + width], [y1 + height, x1, x1 + width])
+        self.blocks.append(block)
 
     def add_trap(self, tile, pos):
-        Trap(tile, pos, self, self.traps)
-
-    def add_walls(self, *args):
-        for xyy in args:
-            Wall(*xyy, self.walls)  # if self in parameters, borders will be shown
-
-    def add_floors(self, *args):
-        for yxx in args:
-            Floor(*yxx, self.floors)  # # if self in parameters, borders will be shown
+        trap = Trap(tile, pos, self)
+        self.traps.append(trap)
 
     def spawn_player(self):
         try:
@@ -57,13 +46,13 @@ class Level(pygame.sprite.Group):
 
 class DayLevel(Level):
     def __init__(self):
-        super().__init__('data/background/daybackground.png', (14, 300), (1248, 254))
+        super().__init__('data/background/daybackground.png', (14, 96), (1248, 254))
         self.load_lvl('day')
 
 
 class EveningLevel(Level):
     def __init__(self):
-        super().__init__('data/background/eveningbackground.png', (30, 313), (1248, 254))
+        super().__init__('data/background/eveningbackground.png', (16, 152), (1248, 254))
         self.load_lvl('evening')
 
 
@@ -74,29 +63,15 @@ class NightLevel(Level):
 
 
 class Block(pygame.sprite.Sprite):
-    def __init__(self, tile, pos, *groups):
+    def __init__(self, file, pos, *groups):
         super().__init__(*groups)
-        self.image = pygame.image.load(tile)
+        self.image = pygame.image.load(file)
         self.rect = self.image.get_rect()
         self.rect.x, self.rect.y = pos
 
 
 class Trap(Block):
     pass
-
-
-class Wall(pygame.sprite.Sprite):
-    def __init__(self, x, y1, y2, *groups):
-        super().__init__(*groups)
-        self.image = pygame.Surface([2, y2 - y1])
-        self.rect = pygame.Rect(x - 1, y1, 2, y2 - y1)
-
-
-class Floor(pygame.sprite.Sprite):
-    def __init__(self, y, x1, x2, *groups):
-        super().__init__(*groups)
-        self.image = pygame.Surface([x2 - x1, 2])
-        self.rect = pygame.Rect(x1, y - 1, x2 - x1, 2)
 
 
 class Idle(pygame.sprite.Sprite):
@@ -189,13 +164,20 @@ class Hold(pygame.sprite.Sprite):
 class Player(pygame.sprite.Sprite):
     def __init__(self, x, y, groups=None):
         super().__init__(groups)
-        self.x, self.y = x, y
         self.vx, self.vy = 0, 0
         self.hp = 1
 
-        self.sprites = [Idle(), Run(), Jump(), Bounce(), Dead(), Hold()]
         self.right = True
-        self.update('idle')
+        self.onGround = False
+        self.onWall = False
+        self.jumpower = 10
+
+        self.sprites = [Idle(), Run(), Jump(), Bounce(), Dead(), Hold()]
+        self.sprite = self.sprites[0]
+        self.sprite.update(True)
+        self.image = self.sprite.image
+        self.rect = self.image.get_rect()
+        self.rect.x, self.rect.y = x, y
 
     def change_facing(self):
         if self.vx > 0:
@@ -203,27 +185,51 @@ class Player(pygame.sprite.Sprite):
         elif self.vx < 0:
             self.right = False
 
-    def move_ip(self):
-        self.x += self.vx
-        self.y += self.vy
-        self.rect.x, self.rect.y = self.x, self.y
+    def collide(self, lvl):
+        for obj in lvl.blocks:
+            if pygame.sprite.spritecollide(self, [obj], False):
+                if self.vx > 0:
+                    self.right = False
+                    self.vx = 0
+                    self.rect.right = obj.rect.left
+                    self.onWall = True
+                    self.onGround = False
+                elif self.vx < 0:
+                    self.right = True
+                    self.vx = 0
+                    self.rect.left = obj.rect.right
+                    self.onWall = True
+                    self.onGround = False
+                if self.vy > 0:  # если падает вниз
+                    self.rect.bottom = obj.rect.top  # то не падает вниз
+                    self.onGround = True  # и становится на что-то твердое
+                    self.onWall = False
+                    self.vy = 0  # и энергия падения пропадает
 
-    def update(self, action):
+                elif self.vy < 0:  # если движется вверх
+                    self.rect.top = obj.rect.bottom  # то не движется вверх
+                    self.onGround = False
+                    self.vy = 0  # и энергия прыжка пропадает
+                break
+
+    def move_ip(self, lvl):
+        self.rect.y += self.vy
+        self.collide(lvl)
+        self.rect.x += self.vx
+        self.collide(lvl)
+
+    def update(self, action, lvl):
         self.change_facing()
-        try:
-            if action != self.sprite.name:
-                self.sprites = [Idle(), Run(), Jump(), Bounce(), Dead(), Hold()]
-
-        except AttributeError:
-            pass
+        if action != self.sprite.name:
+            self.sprites = [Idle(), Run(), Jump(), Bounce(), Dead(), Hold()]
         for sprite in self.sprites:
             if sprite.name == action:
                 self.sprite = sprite
                 self.sprite.update(self.right)
                 self.image = self.sprite.image
-                self.rect = self.image.get_rect()
-
-        self.move_ip()
+                self.rect.width, self.rect.height = self.image.get_width(), self.image.get_height()
+                break
+        self.move_ip(lvl)
 
 
 class Label(pygame.sprite.Sprite):
