@@ -116,16 +116,22 @@ def mainloop():
     playing_music = True
     pygame.mouse.set_visible(False)
 
+    level.spawn_player()
+
     # main loop
     while ingame:
+        # music
         if not playing_music:
             pygame.mixer.music.pause()
         else:
             pygame.mixer.music.unpause()
+
+        # getting pressed keys
+        k_right, k_left, k_up = event_checker()
         # updating level
-        action = movements(*event_checker())
-        level.update(action, level)
+        level.update(k_right, k_left, k_up, level.blocks)
         level.draw(screen)
+
         # updating frame
         pygame.display.flip()
         clock.tick(FPS)
@@ -144,59 +150,20 @@ def event_checker():
         if event.type == pygame.KEYDOWN:
             if event.key == pygame.K_ESCAPE:
                 escape()
-            if event.key == pygame.K_HOME:
+            elif event.key == pygame.K_HOME:
                 level.spawn_player()
 
     keys = pygame.key.get_pressed()
-    right, left, space = False, False, False
-    if keys[pygame.K_RIGHT]:
-        right = True
-    elif keys[pygame.K_LEFT]:
-        left = True
-    if keys[pygame.K_SPACE]:
-        space = True
-    return right, left, space
-
-
-def movements(k_right, k_left, k_space):
-    action = level.player.sprite.name
-    if k_space:
-        if level.player.onGround:
-            action = 'jump'
-            level.player.vy = -level.player.jumpower
-            level.player.onGround = False
-        elif level.player.onWall:
-            action = 'bounce'
-            level.player.vy = -level.player.jumpower
-            level.player.vx = -level.player.jumpower if not level.player.right else level.player.jumpower
-            level.player.onGround = False
-    if k_right:
-        level.player.vx = 4
-        if level.player.onGround:
-            action = 'run'
-    elif k_left:
-        level.player.vx = -4
-        if level.player.onGround:
-            action = 'run'
-    else:
-        # if nothing among k_right and k_left is True
-        level.player.vx = 0
-        if level.player.onGround:
-            action = 'idle'
-
-    #  gravitation if not on the floor
-    if not level.player.onGround:
-        action = 'jump'
-        level.player.vy += level.gravity
-
-    return action
+    up = True if keys[pygame.K_UP] else False
+    right = True if keys[pygame.K_RIGHT] else False
+    left = True if keys[pygame.K_LEFT] else False
+    return right, left, up
 
 
 def main():
     global levels, level
     levels = iter((DayLevel(), EveningLevel(), NightLevel()))
     level = change_level()
-    level.spawn_player()
 
     begin()
     mainloop()

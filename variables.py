@@ -2,15 +2,17 @@ import pygame
 import sys
 from itertools import cycle
 
-FPS = 60
-ANIMATION_SPEED = FPS // 3  # lower == faster | FPS // N -> N animation cycles in 60 frames
+FPS = 45
+ANIMATION_SPEED = FPS // 2  # lower == faster | FPS // N -> N animation cycles in 60 frames
 SIZE = WIDTH, HEIGHT = 1280, 424  # screen size
 
 pygame.init()
 clock = pygame.time.Clock()
 ingame = True
 
-screen = pygame.display.set_mode(SIZE)
+GRAVITY = 0.7
+
+screen = pygame.display.set_mode(SIZE, pygame.DOUBLEBUF)
 pygame.display.set_caption("The walkthrough")
 
 intro_text = ['Инструкция такова:',

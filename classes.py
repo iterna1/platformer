@@ -9,8 +9,6 @@ class Level(pygame.sprite.Group):
         self.blocks, self.traps = [], []
         self.floors, self.walls = [], []
 
-        self.gravity = 0.75
-
     def load_lvl(self, txt):
         with open('data/levels/%s.txt' % txt, 'r') as file:
             self.map = map(lambda line: line.rstrip(), file.readlines())
@@ -89,6 +87,9 @@ class Idle(pygame.sprite.Sprite):
         self.image = self.images[next(self.animcount)]
         self.rect = self.image.get_rect()
 
+    def set_default(self):
+        self.animcount = cycle([int(f / (ANIMATION_SPEED / Idle.length)) for f in range(ANIMATION_SPEED)])
+
 
 class Run(pygame.sprite.Sprite):
     name = 'run'
@@ -105,6 +106,9 @@ class Run(pygame.sprite.Sprite):
         self.image = self.images[next(self.animcount)]
         self.rect = self.image.get_rect()
 
+    def set_default(self):
+        self.animcount = cycle([int(f / (ANIMATION_SPEED / Run.length)) for f in range(ANIMATION_SPEED)])
+
 
 class Jump(pygame.sprite.Sprite):
     name = 'jump'
@@ -117,6 +121,9 @@ class Jump(pygame.sprite.Sprite):
     def update(self, right=True):
         self.image = Jump.right if right else Jump.left
         self.rect = self.image.get_rect()
+
+    def set_default(self):
+        pass
 
 
 class Bounce(pygame.sprite.Sprite):
@@ -134,6 +141,9 @@ class Bounce(pygame.sprite.Sprite):
         self.image = self.images[next(self.animcount)]
         self.rect = self.image.get_rect()
 
+    def set_default(self):
+        self.animcount = cycle([int(f / (ANIMATION_SPEED / Bounce.length)) for f in range(ANIMATION_SPEED)])
+
 
 class Dead(pygame.sprite.Sprite):
     name = 'dead'
@@ -146,6 +156,9 @@ class Dead(pygame.sprite.Sprite):
     def update(self, right=True):
         self.image = Dead.right if right else Dead.left
         self.rect = self.image.get_rect()
+
+    def set_default(self):
+        pass
 
 
 class Hold(pygame.sprite.Sprite):
@@ -170,7 +183,7 @@ class Player(pygame.sprite.Sprite):
         self.right = True
         self.onGround = False
         self.onWall = False
-        self.jumpower = 10
+        self.jumpower = 8
 
         self.sprites = [Idle(), Run(), Jump(), Bounce(), Dead(), Hold()]
         self.sprite = self.sprites[0]
@@ -179,49 +192,68 @@ class Player(pygame.sprite.Sprite):
         self.rect = self.image.get_rect()
         self.rect.x, self.rect.y = x, y
 
-    def change_facing(self):
-        if self.vx > 0:
-            self.right = True
-        elif self.vx < 0:
+    def collide(self, vx, vy, blocks):
+        for obj in blocks:
+            if pygame.sprite.collide_rect(self, obj):  # if collision between player and block
+
+                if vx > 0:  # if going right
+                    self.rect.right = obj.rect.left  # then stop
+                    self.onWall = True
+
+                elif vx < 0:  # if going left
+                    self.rect.left = obj.rect.right  # then stop
+                    self.onWall = True
+
+                if vy > 0:  # if falling down
+                    self.rect.bottom = obj.rect.top  # then stop
+                    self.onGround = True  # and standing
+                    self.vy = 0
+
+                elif vy < 0:  # if going up
+                    self.rect.top = obj.rect.bottom  # then stop
+                    self.vy = 0
+                return
+
+    def update(self, right, left, up, blocks):
+        action = self.sprite.name
+        if up:
+            if self.onGround:  # can jump only when on floor
+                self.vy = -self.jumpower
+            action = 'jump'
+
+        if left:
+            self.vx = -4
             self.right = False
+            if not up and self.onGround:
+                action = 'run'
 
-    def collide(self, lvl):
-        for obj in lvl.blocks:
-            if pygame.sprite.spritecollide(self, [obj], False):
-                if self.vx > 0:
-                    self.right = False
-                    self.vx = 0
-                    self.rect.right = obj.rect.left
-                    self.onWall = True
-                    self.onGround = False
-                elif self.vx < 0:
-                    self.right = True
-                    self.vx = 0
-                    self.rect.left = obj.rect.right
-                    self.onWall = True
-                    self.onGround = False
-                if self.vy > 0:  # если падает вниз
-                    self.rect.bottom = obj.rect.top  # то не падает вниз
-                    self.onGround = True  # и становится на что-то твердое
-                    self.onWall = False
-                    self.vy = 0  # и энергия падения пропадает
+        if right:
+            self.vx = 4
+            self.right = True
+            if not up and self.onGround:
+                action = 'run'
 
-                elif self.vy < 0:  # если движется вверх
-                    self.rect.top = obj.rect.bottom  # то не движется вверх
-                    self.onGround = False
-                    self.vy = 0  # и энергия прыжка пропадает
-                break
+        if not (left or right):  # vx = 0 when not any(right, left)
+            self.vx = 0
+            if not up and self.onGround:
+                action = 'idle'
 
-    def move_ip(self, lvl):
+        if not self.onGround:
+            self.vy += GRAVITY
+
+        self.set_sprite(action)
+
+        self.onGround = False
+        self.onWall = False
+
         self.rect.y += self.vy
-        self.collide(lvl)
+        self.collide(0, self.vy, blocks)
         self.rect.x += self.vx
-        self.collide(lvl)
+        self.collide(self.vx, 0, blocks)
 
-    def update(self, action, lvl):
-        self.change_facing()
+    def set_sprite(self, action):
         if action != self.sprite.name:
-            self.sprites = [Idle(), Run(), Jump(), Bounce(), Dead(), Hold()]
+            self.sprite.set_default()
         for sprite in self.sprites:
             if sprite.name == action:
                 self.sprite = sprite
@@ -229,7 +261,6 @@ class Player(pygame.sprite.Sprite):
                 self.image = self.sprite.image
                 self.rect.width, self.rect.height = self.image.get_width(), self.image.get_height()
                 break
-        self.move_ip(lvl)
 
 
 class Label(pygame.sprite.Sprite):
